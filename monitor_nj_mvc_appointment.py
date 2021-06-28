@@ -1,4 +1,4 @@
-from datetime import datetimes
+from datetime import datetime
 from bs4 import BeautifulSoup
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -103,10 +103,10 @@ def _monitor_appointments(config_info):
 
 
 def _send_slack_messages(new_slots):
-  new_messages = ["Appointment link: {},\n\ttype: {}\n\tdate: {},\n\tlocation: {}".format(url, config.APPOINTMENT_TYPE, detail["date"], detail["location"]) for url, detail in new_slots.items()]
-  abridged_message = "\n\n------ \n **New appointment timeslots found!!!**\n------\n\n{}".format(",\n".join(new_messages))
+  new_messages = ["Appointment Slot #{}:\n\tlink: <{}|URL>,\n\ttype: {}\n\tdate: {},\n\tlocation: {}".format(index + 1, url, config.APPOINTMENT_TYPE, detail["date"], detail["location"]) for index, (url, detail) in enumerate(list(new_slots.items()))]
+  abridged_message = "\n\n------ \n *New appointment timeslots found!!!*\n------\n\n{}".format(",\n".join(new_messages))
   try:
-    SLACK_CLIENT.chat_postMessage(channel="C0268KQL5GV", text=abridged_message)
+    SLACK_CLIENT.chat_postMessage(channel=config.SLACK_CHANNEL_ID, text=abridged_message)
   except SlackApiError as e:
     print("Failed to communicate with Slack: {}".format(e.response['error']))
 
