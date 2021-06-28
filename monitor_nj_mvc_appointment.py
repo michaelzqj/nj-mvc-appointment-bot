@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from time import sleep
-
+from collections import defaultdict
 import urllib.request
 
 import private_config as config
@@ -116,7 +116,7 @@ def _check_config():
     exit(1)
 
   if hasattr(config, "APPOINTMENT_TYPES") and config.APPOINTMENT_TYPES and hasattr(config, "LOCATION"):
-    supported_locations = set()
+    supported_locations = MVC_LOCATION_CODES.keys()
     for type in config.APPOINTMENT_TYPES:
       if not supported_locations:
         supported_locations = set(MVC_LOCATION_CODES[type])
@@ -125,7 +125,7 @@ def _check_config():
     if config.LOCATION not in supported_locations:
       print("Appointment location {} is not corrected. Please choose one from the following locations: {}".format(
           config.LOCATION, supported_locations))
-    exit(1)
+      exit(1)
 
 
 def _get_config_info():
@@ -143,9 +143,9 @@ def _get_config_info():
   return info
 
 
-def _monitor_appointments(config_info):
+def _monitor_appointments(user_config_info):
   available_slots = {}
-  for (type, type_code), location_candidates in config_info.items():
+  for (type, type_code), location_candidates in user_config_info.items():
     for location_name, location_code in location_candidates:
       timeslot_url = APPOINTMENT_TEMPLATE_URL.format(
         type_code=type_code, location_code=location_code)
@@ -163,24 +163,32 @@ def _monitor_appointments(config_info):
       if available_timeslots:
         for timeslot in available_timeslots:
           url = APPOINTMNET_URL_PREFIX + timeslot["href"]
-          available_slots[url] = {"type": type, "location": location_name, "url": url, "date": url.split("/")[-2]}
+          time = url.split("/")[-1]
+          time_string = "0" + time[0] + ":" + time[1:] + "AM" if len(time) == 3 else time[0:2] + ":" + time[2:] + ("PM" if int(time[0:2]) >= 12 else "AM")
+          available_slots[url] = {"type": type, "location": location_name, "url": url, "date": url.split("/")[-2], "time": time_string}
   return available_slots
 
 
-def _send_slack_messages(new_slots):
-  new_messages = ["Appointment Slot #{}:\n\tlink: <{}|URL>,\n\ttype: {}\n\tdate: {},\n\tlocation: {}".format(
-    index + 1, url, detail["type"], detail["date"], detail["location"])
-    for index, (url, detail) in enumerate(sorted(list(new_slots.items())))]
+def _send_slack_messages(new_slots, daily_slot_count):
+  new_messages = []
+  type_count = {}
+  for url, detail in sorted(list(new_slots.items())):
+    type = detail["type"]
+    type_count[type] = type_count.get(type, 0) + 1
+    new_messages.append("{} Appointment Slot #{}:\n\tlink: <{}|URL>,\n\tdate: {},\n\ttime: {}\n\tlocation: {}".format(
+    type, type_count[type] + daily_slot_count.get(type, 0), url, detail["date"], detail["time"], detail["location"]))
   abridged_message = "\n\n------ \n *New appointment timeslots found!!!*\n------\n\n{}".format(",\n".join(new_messages))
   try:
     SLACK_CLIENT.chat_postMessage(channel=config.SLACK_CHANNEL_ID, text=abridged_message)
   except SlackApiError as e:
     print("Failed to communicate with Slack: {}".format(e.response['error']))
+  return type_count
 
 if __name__ == "__main__":
   config_info = _get_config_info()
   former_date = datetime.today().strftime("%Y-%m-%d")
   daily_found_urls = set()
+  slot_count = {}
   while True:
     available_slots = _monitor_appointments(config_info)
     urls = set(available_slots.keys())
@@ -188,9 +196,12 @@ if __name__ == "__main__":
     daily_found_urls = daily_found_urls.union(urls)
     if len(new_urls) > 0:
       new_slots = {url: available_slots[url] for url in new_urls}
-      _send_slack_messages(new_slots)
+      new_count = _send_slack_messages(new_slots, slot_count)
+      for type, count in new_count.items():
+        slot_count[type] = slot_count.get(type, 0) + count
     sleep(10)
     current_date = datetime.today().strftime("%Y-%m-%d")
     if current_date != former_date:
       former_date = current_date
       daily_found_urls.clear()
+      slot_count.clear()
