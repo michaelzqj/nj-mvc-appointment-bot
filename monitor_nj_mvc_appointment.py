@@ -3,10 +3,9 @@ from bs4 import BeautifulSoup
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from time import sleep
-from collections import defaultdict
 import urllib.request
 
-import private_config as config
+import example_config as config
 
 APPOINTMNET_URL_PREFIX = "https://telegov.njportal.com"
 
