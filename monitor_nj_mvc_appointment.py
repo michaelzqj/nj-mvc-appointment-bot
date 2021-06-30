@@ -115,7 +115,7 @@ def _check_config():
     exit(1)
 
   if hasattr(config, "APPOINTMENT_TYPES") and config.APPOINTMENT_TYPES and hasattr(config, "LOCATION"):
-    supported_locations = MVC_LOCATION_CODES.keys()
+    supported_locations = set(MVC_LOCATION_CODES.keys())
     for type in config.APPOINTMENT_TYPES:
       if not supported_locations:
         supported_locations = set(MVC_LOCATION_CODES[type])
