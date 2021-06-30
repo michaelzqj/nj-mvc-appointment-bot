@@ -201,6 +201,7 @@ if __name__ == "__main__":
     sleep(10)
     current_date = datetime.today().strftime("%Y-%m-%d")
     if current_date != former_date:
+      print("Passing one day, resetting the daily found urls and slot count...")
       former_date = current_date
       daily_found_urls.clear()
       slot_count.clear()

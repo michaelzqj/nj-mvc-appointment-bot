@@ -3,6 +3,7 @@
 Script bot for monitor appointment for NJ MVC. This script requires following Python package for running:
 
 - bs4 (beautifulsoup)
+- slack\_sdk (Slack SDK Python)
 
 This script will montior the availablity from https://telegov.njportal.com/njmvc/AppointmentWizard/ and if there's availability, then this script will send this to the [Slack](https://slack.com/) channel(configurable) to notify the users in that channel.
 
