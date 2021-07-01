@@ -158,7 +158,11 @@ def _monitor_appointments(user_config_info):
 
       result_html = response.read().decode("utf8")
       soup = BeautifulSoup(result_html, "html.parser")
-      available_timeslots = soup.find(id="timeslots").findChildren("a", recursive=False, href=True)
+      timeslots_container = soup.find(id="timeslots")
+      if not timeslots_container:
+        print("Failed to find timeslots container while requesting {}, skipping".format(timeslot_url))
+        continue
+      available_timeslots = timeslots_container.findChildren("a", recursive=False, href=True)
       if available_timeslots:
         for timeslot in available_timeslots:
           url = APPOINTMNET_URL_PREFIX + timeslot["href"]
