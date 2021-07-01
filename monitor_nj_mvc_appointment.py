@@ -4,8 +4,13 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from time import sleep
 import urllib.request
+import argparse
 
 import example_config as config
+
+PARSER = argparse.ArgumentParser()
+PARSER.add_argument("--slack", help="print the avialble slots information to the configured slack channel", action="store_true")
+ARGS = PARSER.parse_args()
 
 APPOINTMNET_URL_PREFIX = "https://telegov.njportal.com"
 
@@ -104,7 +109,7 @@ MVC_LOCATION_CODES = {
 
 APPOINTMENT_TEMPLATE_URL = "https://telegov.njportal.com/njmvc/AppointmentWizard/{type_code}/{location_code}"
 
-SLACK_CLIENT = WebClient(token=config.SLACK_BOT_TOKEN)
+SLACK_CLIENT = WebClient(token=config.SLACK_BOT_TOKEN) if ARGS.slack else None
 
 
 def _check_config():
@@ -182,7 +187,7 @@ def _send_slack_message(message):
     print("Failed to communicate with Slack: {}".format(e.response['error']))
 
 
-def _send_slack_messages(new_slots, daily_slot_count):
+def _log_available_timeslots(new_slots, daily_slot_count):
   new_messages = []
   type_count = {}
   for url, detail in sorted(list(new_slots.items())):
@@ -191,8 +196,12 @@ def _send_slack_messages(new_slots, daily_slot_count):
     new_messages.append("{} Appointment Slot #{}:\n\tlink: <{}|URL>,\n\tdate: {},\n\ttime: {}\n\tlocation: {}".format(
     type, type_count[type] + daily_slot_count.get(type, 0), url, detail["date"], detail["time"], detail["location"]))
   abridged_message = "\n\n------ \n *New appointment timeslots found!!!*\n------\n\n{}".format(",\n".join(new_messages))
-  _send_slack_message(abridged_message)
+  if ARGS.slack:
+    _send_slack_message(abridged_message)
+  else:
+    print(abridged_message)
   return type_count
+
 
 if __name__ == "__main__":
   config_info = _get_config_info()
@@ -206,7 +215,7 @@ if __name__ == "__main__":
     daily_found_urls = daily_found_urls.union(urls)
     if len(new_urls) > 0:
       new_slots = {url: available_slots[url] for url in new_urls}
-      new_count = _send_slack_messages(new_slots, slot_count)
+      new_count = _log_available_timeslots(new_slots, slot_count)
       for type, count in new_count.items():
         slot_count[type] = slot_count.get(type, 0) + count
     sleep(10)
