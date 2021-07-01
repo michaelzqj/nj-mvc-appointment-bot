@@ -160,7 +160,10 @@ def _monitor_appointments(user_config_info):
       soup = BeautifulSoup(result_html, "html.parser")
       timeslots_container = soup.find(id="timeslots")
       if not timeslots_container:
-        print("Failed to find timeslots container while requesting {}, skipping".format(timeslot_url))
+        message = "Failed to find timeslots container while requesting {}, probably the MVC appointment system is down, waiting for 30 minutes to continue trying".format(timeslot_url)
+        print(message)
+        _send_slack_message(message)
+        sleep(1800)
         continue
       available_timeslots = timeslots_container.findChildren("a", recursive=False, href=True)
       if available_timeslots:
@@ -172,6 +175,13 @@ def _monitor_appointments(user_config_info):
   return available_slots
 
 
+def _send_slack_message(message):
+  try:
+    SLACK_CLIENT.chat_postMessage(channel=config.SLACK_CHANNEL_ID, text=message)
+  except SlackApiError as e:
+    print("Failed to communicate with Slack: {}".format(e.response['error']))
+
+
 def _send_slack_messages(new_slots, daily_slot_count):
   new_messages = []
   type_count = {}
@@ -181,10 +191,7 @@ def _send_slack_messages(new_slots, daily_slot_count):
     new_messages.append("{} Appointment Slot #{}:\n\tlink: <{}|URL>,\n\tdate: {},\n\ttime: {}\n\tlocation: {}".format(
     type, type_count[type] + daily_slot_count.get(type, 0), url, detail["date"], detail["time"], detail["location"]))
   abridged_message = "\n\n------ \n *New appointment timeslots found!!!*\n------\n\n{}".format(",\n".join(new_messages))
-  try:
-    SLACK_CLIENT.chat_postMessage(channel=config.SLACK_CHANNEL_ID, text=abridged_message)
-  except SlackApiError as e:
-    print("Failed to communicate with Slack: {}".format(e.response['error']))
+  _send_slack_message(abridged_message)
   return type_count
 
 if __name__ == "__main__":
