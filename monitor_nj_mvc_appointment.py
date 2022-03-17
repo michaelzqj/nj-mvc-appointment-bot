@@ -9,7 +9,7 @@ import argparse
 import example_config as config
 
 PARSER = argparse.ArgumentParser()
-PARSER.add_argument("--slack", help="print the avialble slots information to the configured slack channel", action="store_true")
+PARSER.add_argument("--slack", help="print the availble slots information to the configured slack channel", default=True, action="store_true")
 ARGS = PARSER.parse_args()
 
 APPOINTMNET_URL_PREFIX = "https://telegov.njportal.com"
@@ -120,16 +120,17 @@ def _check_config():
     exit(1)
 
   if hasattr(config, "APPOINTMENT_TYPES") and config.APPOINTMENT_TYPES and hasattr(config, "LOCATION"):
-    supported_locations = set(MVC_LOCATION_CODES.keys())
+    supported_locations = set()
     for type in config.APPOINTMENT_TYPES:
       if not supported_locations:
         supported_locations = set(MVC_LOCATION_CODES[type])
         continue
       supported_locations = supported_locations.intersection(set(MVC_LOCATION_CODES[type]))
-    if config.LOCATION not in supported_locations:
-      print("Appointment location {} is not corrected. Please choose one from the following locations: {}".format(
-          config.LOCATION, supported_locations))
-      exit(1)
+    for location in config.LOCATION:
+      if location not in supported_locations:
+        print("Appointment location {} is not corrected. Please choose one from the following locations: {}".format(
+            location, supported_locations))
+        exit(1)
 
 
 def _get_config_info():
@@ -140,7 +141,7 @@ def _get_config_info():
   for type, type_code in type_candidates:
     if type not in MVC_LOCATION_CODES:
       continue
-    type_location_candidates = [(config.LOCATION, MVC_LOCATION_CODES[type][config.LOCATION])] if hasattr(config,
+    type_location_candidates = [(location, MVC_LOCATION_CODES[type][location]) for location in config.LOCATION] if hasattr(config,
                                                                                                   "LOCATION") and config.LOCATION else list(
     MVC_LOCATION_CODES[type].items())
     info[(type, type_code)] = type_location_candidates
@@ -184,7 +185,7 @@ def _send_slack_message(message):
   try:
     SLACK_CLIENT.chat_postMessage(channel=config.SLACK_CHANNEL_ID, text=message)
   except SlackApiError as e:
-    print("Failed to communicate with Slack: {}".format(e.response['error']))
+    print("Failed to communicate with Slack: {}".format(e))
 
 
 def _log_available_timeslots(new_slots, daily_slot_count):
